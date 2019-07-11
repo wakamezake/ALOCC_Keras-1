@@ -12,7 +12,6 @@ from keras import losses
 from keras.callbacks import TensorBoard
 from keras.utils import to_categorical
 import keras.backend as K
-import scipy
 import logging
 import matplotlib.pyplot as plt
 import os
@@ -218,7 +217,7 @@ class AloccModel:
         # Export images as montage, sample_input also use later to generate sample R network outputs during training.
         sample_inputs = np.array(sample).astype(np.float32)
         os.makedirs(self.sample_dir, exist_ok=True)
-        scipy.misc.imsave('./{}/train_input_samples.jpg'.format(self.sample_dir), montage(sample_inputs[:, :, :, 0]))
+        # scipy.misc.imsave('./{}/train_input_samples.jpg'.format(self.sample_dir), montage(sample_inputs[:, :, :, 0]))
 
         counter = 1
         # Record generator/R network reconstruction training losses.
@@ -270,8 +269,8 @@ class AloccModel:
                         samples = self.generator.predict(sample_inputs)
                         manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
                         manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
-                        save_images(samples, [manifold_h, manifold_w],
-                                    './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
+                        # save_images(samples, [manifold_h, manifold_w],
+                        #             './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
 
             # Save the checkpoint end of each epoch.
             self.save(epoch)
