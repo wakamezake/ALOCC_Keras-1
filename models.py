@@ -23,15 +23,15 @@ from utils import *
 from kh_tools import *
 
 
-class ALOCC_Model():
+class AloccModel:
     def __init__(self,
-               input_height=28,input_width=28, output_height=28, output_width=28,
-               attention_label=1, is_training=True,
-               z_dim=100, gf_dim=16, df_dim=16, c_dim=3,
-               dataset_name=None, dataset_address=None, input_fname_pattern=None,
-               checkpoint_dir='checkpoint', log_dir='log', sample_dir='sample', r_alpha = 0.2,
-               kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1,
-               n_fetch_data=10):
+                 input_height=28, input_width=28, output_height=28, output_width=28,
+                 attention_label=1, is_training=True,
+                 z_dim=100, gf_dim=16, df_dim=16, c_dim=3,
+                 dataset_name=None, dataset_address=None, input_fname_pattern=None,
+                 checkpoint_dir='checkpoint', log_dir='log', sample_dir='sample', r_alpha=0.2,
+                 kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1,
+                 n_fetch_data=10):
         """
         This is the main class of our Adversarially Learned One-Class Classifier for Novelty Detection.
         :param sess: TensorFlow session.
@@ -76,26 +76,29 @@ class ALOCC_Model():
         self.df_dim = df_dim
 
         self.dataset_name = dataset_name
-        self.dataset_address= dataset_address
+        self.dataset_address = dataset_address
         self.input_fname_pattern = input_fname_pattern
         self.checkpoint_dir = checkpoint_dir
         self.log_dir = log_dir
 
         self.attention_label = attention_label
         if self.is_training:
-          logging.basicConfig(filename='ALOCC_loss.log', level=logging.INFO)
+            logging.basicConfig(filename='ALOCC_loss.log', level=logging.INFO)
 
         if self.dataset_name == 'mnist':
-          (X_train, y_train), (_, _) = mnist.load_data()
-          # Make the data range between 0~1.
-          X_train = X_train / 255
-          specific_idx = np.where(y_train == self.attention_label)[0]
-          self.data = X_train[specific_idx].reshape(-1, 28, 28, 1)
-          self.c_dim = 1
+            (X_train, y_train), (_, _) = mnist.load_data()
+            # Make the data range between 0~1.
+            X_train = X_train / 255
+            specific_idx = np.where(y_train == self.attention_label)[0]
+            self.data = X_train[specific_idx].reshape(-1, 28, 28, 1)
+            self.c_dim = 1
         else:
-          assert('Error in loading dataset')
+            assert ('Error in loading dataset')
 
         self.grayscale = (self.c_dim == 1)
+        self.discriminator = None
+        self.generator = None
+        self.adversarial_model = None
         self.build_model()
 
     def build_generator(self, input_shape):
@@ -109,29 +112,32 @@ class ALOCC_Model():
         """
         image = Input(shape=input_shape, name='z')
         # Encoder.
-        x = Conv2D(filters=self.df_dim * 2, kernel_size = 5, strides=2, padding='same', name='g_encoder_h0_conv')(image)
+        x = Conv2D(filters=self.df_dim * 2, kernel_size=5, strides=2, padding='same', name='g_encoder_h0_conv')(image)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
-        x = Conv2D(filters=self.df_dim * 4, kernel_size = 5, strides=2, padding='same', name='g_encoder_h1_conv')(x)
+        x = Conv2D(filters=self.df_dim * 4, kernel_size=5, strides=2, padding='same', name='g_encoder_h1_conv')(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
-        x = Conv2D(filters=self.df_dim * 8, kernel_size = 5, strides=2, padding='same', name='g_encoder_h2_conv')(x)
+        x = Conv2D(filters=self.df_dim * 8, kernel_size=5, strides=2, padding='same', name='g_encoder_h2_conv')(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
 
         # Decoder.
         # TODO: need a flexable solution to select output_padding and padding.
-        # x = Conv2DTranspose(self.gf_dim*2, kernel_size = 5, strides=2, activation='relu', padding='same', output_padding=0, name='g_decoder_h0')(x)
+        # x = Conv2DTranspose(self.gf_dim*2, kernel_size = 5, strides=2, activation='relu', padding='same',
+        # output_padding=0, name='g_decoder_h0')(x)
         # x = BatchNormalization()(x)
-        # x = Conv2DTranspose(self.gf_dim*1, kernel_size = 5, strides=2, activation='relu', padding='same', output_padding=1, name='g_decoder_h1')(x)
+        # x = Conv2DTranspose(self.gf_dim*1, kernel_size = 5, strides=2, activation='relu', padding='same',
+        # output_padding=1, name='g_decoder_h1')(x)
         # x = BatchNormalization()(x)
-        # x = Conv2DTranspose(self.c_dim,    kernel_size = 5, strides=2, activation='tanh', padding='same', output_padding=1, name='g_decoder_h2')(x)
+        # x = Conv2DTranspose(self.c_dim,    kernel_size = 5, strides=2, activation='tanh', padding='same',
+        # output_padding=1, name='g_decoder_h2')(x)
 
-        x = Conv2D(self.gf_dim*1, kernel_size=5, activation='relu', padding='same')(x)
+        x = Conv2D(self.gf_dim * 1, kernel_size=5, activation='relu', padding='same')(x)
         x = UpSampling2D((2, 2))(x)
-        x = Conv2D(self.gf_dim*1, kernel_size=5, activation='relu', padding='same')(x)
+        x = Conv2D(self.gf_dim * 1, kernel_size=5, activation='relu', padding='same')(x)
         x = UpSampling2D((2, 2))(x)
-        x = Conv2D(self.gf_dim*2, kernel_size=3, activation='relu')(x)
+        x = Conv2D(self.gf_dim * 2, kernel_size=3, activation='relu')(x)
         x = UpSampling2D((2, 2))(x)
         x = Conv2D(self.c_dim, kernel_size=5, activation='sigmoid', padding='same')(x)
         return Model(image, x, name='R')
@@ -148,18 +154,18 @@ class ALOCC_Model():
         """
 
         image = Input(shape=input_shape, name='d_input')
-        x = Conv2D(filters=self.df_dim, kernel_size = 5, strides=2, padding='same', name='d_h0_conv')(image)
+        x = Conv2D(filters=self.df_dim, kernel_size=5, strides=2, padding='same', name='d_h0_conv')(image)
         x = LeakyReLU()(x)
 
-        x = Conv2D(filters=self.df_dim*2, kernel_size = 5, strides=2, padding='same', name='d_h1_conv')(x)
+        x = Conv2D(filters=self.df_dim * 2, kernel_size=5, strides=2, padding='same', name='d_h1_conv')(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
 
-        x = Conv2D(filters=self.df_dim*4, kernel_size = 5, strides=2, padding='same', name='d_h2_conv')(x)
+        x = Conv2D(filters=self.df_dim * 4, kernel_size=5, strides=2, padding='same', name='d_h2_conv')(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
 
-        x = Conv2D(filters=self.df_dim*8, kernel_size = 5, strides=2, padding='same', name='d_h3_conv')(x)
+        x = Conv2D(filters=self.df_dim * 8, kernel_size=5, strides=2, padding='same', name='d_h3_conv')(x)
         x = BatchNormalization()(x)
         x = LeakyReLU()(x)
 
@@ -186,13 +192,13 @@ class ALOCC_Model():
 
         self.discriminator.trainable = False
         validity = self.discriminator(reconstructed_img)
-        
+
         # Model to train Generator/R to minimize reconstruction loss and trick D to see
         # generated images as real ones.
         self.adversarial_model = Model(img, [reconstructed_img, validity])
         self.adversarial_model.compile(loss=['binary_crossentropy', 'binary_crossentropy'],
-            loss_weights=[self.r_alpha, 1],
-            optimizer=optimizer)
+                                       loss_weights=[self.r_alpha, 1],
+                                       optimizer=optimizer)
 
         print('\n\rdiscriminator')
         self.discriminator.summary()
@@ -200,12 +206,11 @@ class ALOCC_Model():
         print('\n\adversarial_model')
         self.adversarial_model.summary()
 
-    
-    def train(self, epochs, batch_size = 128, sample_interval=500):
+    def train(self, epochs, batch_size=128, sample_interval=500):
         # Make log folder if not exist.
         log_dir = os.path.join(self.log_dir, self.model_dir)
         os.makedirs(log_dir, exist_ok=True)
-        
+
         if self.dataset_name == 'mnist':
             # Get a batch of sample images with attention_label to export as montage.
             sample = self.data[0:batch_size]
@@ -213,7 +218,7 @@ class ALOCC_Model():
         # Export images as montage, sample_input also use later to generate sample R network outputs during training.
         sample_inputs = np.array(sample).astype(np.float32)
         os.makedirs(self.sample_dir, exist_ok=True)
-        scipy.misc.imsave('./{}/train_input_samples.jpg'.format(self.sample_dir), montage(sample_inputs[:,:,:,0]))
+        scipy.misc.imsave('./{}/train_input_samples.jpg'.format(self.sample_dir), montage(sample_inputs[:, :, :, 0]))
 
         counter = 1
         # Record generator/R network reconstruction training losses.
@@ -229,11 +234,11 @@ class ALOCC_Model():
         zeros = np.zeros((batch_size, 1))
 
         for epoch in range(epochs):
-            print('Epoch ({}/{})-------------------------------------------------'.format(epoch,epochs))
+            print('Epoch ({}/{})-------------------------------------------------'.format(epoch, epochs))
             if self.dataset_name == 'mnist':
                 # Number of batches computed by total number of target data / batch size.
                 batch_idxs = len(self.data) // batch_size
-             
+
             for idx in range(0, batch_idxs):
                 # Get a batch of images and add random noise.
                 if self.dataset_name == 'mnist':
@@ -252,11 +257,12 @@ class ALOCC_Model():
 
                     # Update R network twice, minimize noisy z->R->D->ones and reconstruction loss.
                     self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
-                    g_loss = self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])    
-                    plot_epochs.append(epoch+idx/batch_idxs)
+                    g_loss = self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
+                    plot_epochs.append(epoch + idx / batch_idxs)
                     plot_g_recon_losses.append(g_loss[1])
                 counter += 1
-                msg = 'Epoch:[{0}]-[{1}/{2}] --> d_loss: {3:>0.3f}, g_loss:{4:>0.3f}, g_recon_loss:{4:>0.3f}'.format(epoch, idx, batch_idxs, d_loss_real+d_loss_fake, g_loss[0], g_loss[1])
+                msg = 'Epoch:[{0}]-[{1}/{2}] --> d_loss: {3:>0.3f}, g_loss:{4:>0.3f}, g_recon_loss:{4:>0.3f}'.format(
+                    epoch, idx, batch_idxs, d_loss_real + d_loss_fake, g_loss[0], g_loss[1])
                 print(msg)
                 logging.info(msg)
                 if np.mod(counter, sample_interval) == 0:
@@ -265,7 +271,7 @@ class ALOCC_Model():
                         manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
                         manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
                         save_images(samples, [manifold_h, manifold_w],
-                            './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
+                                    './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
 
             # Save the checkpoint end of each epoch.
             self.save(epoch)
@@ -274,7 +280,7 @@ class ALOCC_Model():
         plt.xlabel('Epoch')
         plt.ylabel('training loss')
         plt.grid()
-        plt.plot(plot_epochs,plot_g_recon_losses)
+        plt.plot(plot_epochs, plot_g_recon_losses)
         plt.savefig('plot_g_recon_losses.png')
 
     @property
@@ -295,5 +301,5 @@ class ALOCC_Model():
 
 
 if __name__ == '__main__':
-    model = ALOCC_Model(dataset_name='mnist', input_height=28,input_width=28)
+    model = AloccModel(dataset_name='mnist', input_height=28, input_width=28)
     model.train(epochs=5, batch_size=128, sample_interval=500)
