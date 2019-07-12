@@ -36,7 +36,7 @@ def main():
     batch_size = 128
     sample_interval = 500
 
-    model = AloccModel(dataset_name='mnist', input_height=image_size[0], input_width=image_size[1])
+    model = AloccModel(data=data, dataset_name='mnist', input_height=image_size[0], input_width=image_size[1])
     model.train(epochs=epochs, batch_size=batch_size, sample_interval=sample_interval)
 
 
