@@ -18,7 +18,6 @@ from kh_tools import get_noisy_data
 class AloccModel:
     def __init__(self, data, input_height=28, input_width=28, output_height=28, output_width=28, attention_label=1,
                  z_dim=100, gf_dim=16, df_dim=16, c_dim=1,
-                 dataset_name=None, dataset_address=None, input_fname_pattern=None,
                  checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2,
                  kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1, n_fetch_data=10):
         """
@@ -33,9 +32,6 @@ class AloccModel:
         :param gf_dim: (optional) Dimension of gen filters in first conv layer, i.e. g_decoder_h0. [16] 
         :param df_dim: (optional) Dimension of discrim filters in first conv layer, i.e. d_h0_conv. [16] 
         :param c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
-        :param dataset_name: 'UCSD', 'mnist' or custom defined name.
-        :param dataset_address: path to dataset folder. e.g. './dataset/mnist'.
-        :param input_fname_pattern: Glob pattern of filename of input images e.g. '*'.
         :param checkpoint_dir: path to saved checkpoint(s) directory.
         :param sample_dir: Directory address which save some samples [.]
         :param r_alpha: Refinement parameter, trade-off hyperparameter for the G network loss to reconstruct input images. [0.2]
@@ -60,9 +56,6 @@ class AloccModel:
         self.gf_dim = gf_dim
         self.df_dim = df_dim
 
-        self.dataset_name = dataset_name
-        self.dataset_address = dataset_address
-        self.input_fname_pattern = input_fname_pattern
         self.checkpoint_dir = checkpoint_dir
 
         self.attention_label = attention_label
@@ -245,12 +238,6 @@ class AloccModel:
         plt.grid()
         plt.plot(plot_epochs, plot_g_recon_losses)
         plt.savefig('plot_g_recon_losses.png')
-
-    @property
-    def model_dir(self):
-        return "{}_{}_{}".format(
-            self.dataset_name,
-            self.output_height, self.output_width)
 
     def save(self, step):
         """Helper method to save model weights.
