@@ -1,9 +1,11 @@
 from __future__ import print_function, division
 
-import os
 import logging
-import numpy as np
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
 from keras.datasets import mnist
 from keras.layers import BatchNormalization
 from keras.layers import Input, Dense, Flatten
@@ -14,6 +16,11 @@ from keras.optimizers import RMSprop
 
 from kh_tools import get_noisy_data
 
+# Make log folder if not exist.
+log_path = Path("log")
+if not log_path.exists():
+    log_path.mkdir()
+
 
 class AloccModel:
     def __init__(self,
@@ -21,7 +28,7 @@ class AloccModel:
                  attention_label=1, is_training=True,
                  z_dim=100, gf_dim=16, df_dim=16, c_dim=3,
                  dataset_name=None, dataset_address=None, input_fname_pattern=None,
-                 checkpoint_dir='checkpoint', log_dir='log', sample_dir='sample', r_alpha=0.2,
+                 checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2,
                  kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1,
                  n_fetch_data=10):
         """
@@ -41,7 +48,6 @@ class AloccModel:
         :param dataset_address: path to dataset folder. e.g. './dataset/mnist'.
         :param input_fname_pattern: Glob pattern of filename of input images e.g. '*'.
         :param checkpoint_dir: path to saved checkpoint(s) directory.
-        :param log_dir: log directory for training, can be later viewed in TensorBoard.
         :param sample_dir: Directory address which save some samples [.]
         :param r_alpha: Refinement parameter, trade-off hyperparameter for the G network loss to reconstruct input images. [0.2]
         :param kb_work_on_patch: Boolean value for working on PatchBased System or not, only applies to UCSD dataset [True]
@@ -71,11 +77,12 @@ class AloccModel:
         self.dataset_address = dataset_address
         self.input_fname_pattern = input_fname_pattern
         self.checkpoint_dir = checkpoint_dir
-        self.log_dir = log_dir
 
         self.attention_label = attention_label
         if self.is_training:
-            logging.basicConfig(filename='ALOCC_loss.log', level=logging.INFO)
+            log_file_name = "ALOCC_loss.log"
+            logging.basicConfig(filename=log_path.joinpath(log_file_name),
+                                level=logging.INFO)
 
         if self.dataset_name == 'mnist':
             (X_train, y_train), (_, _) = mnist.load_data()
@@ -199,9 +206,6 @@ class AloccModel:
         self.adversarial_model.summary()
 
     def train(self, epochs, batch_size=128, sample_interval=500):
-        # Make log folder if not exist.
-        log_dir = os.path.join(self.log_dir, self.model_dir)
-        os.makedirs(log_dir, exist_ok=True)
 
         if self.dataset_name == 'mnist':
             # Get a batch of sample images with attention_label to export as montage.
