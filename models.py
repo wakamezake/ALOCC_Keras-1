@@ -18,11 +18,9 @@ from kh_tools import get_noisy_data
 class AloccModel:
     def __init__(self, data, input_height=28, input_width=28, output_height=28, output_width=28, attention_label=1,
                  z_dim=100, gf_dim=16, df_dim=16, c_dim=1,
-                 checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2,
-                 kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1, n_fetch_data=10):
+                 checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2):
         """
         This is the main class of our Adversarially Learned One-Class Classifier for Novelty Detection.
-        :param sess: TensorFlow session.
         :param input_height: The height of image to use.
         :param input_width: The width of image to use.
         :param output_height: The height of the output images to produce.
@@ -34,16 +32,11 @@ class AloccModel:
         :param c_dim: (optional) Dimension of image color. For grayscale input, set to 1. [3]
         :param checkpoint_dir: path to saved checkpoint(s) directory.
         :param sample_dir: Directory address which save some samples [.]
-        :param r_alpha: Refinement parameter, trade-off hyperparameter for the G network loss to reconstruct input images. [0.2]
-        :param kb_work_on_patch: Boolean value for working on PatchBased System or not, only applies to UCSD dataset [True]
-        :param nd_patch_size:  Input patch size, only applies to UCSD dataset.
-        :param n_stride: PatchBased data preprocessing stride, only applies to UCSD dataset.
-        :param n_fetch_data: Fetch size of Data, only applies to UCSD dataset. 
+        :param r_alpha: Refinement parameter, trade-off hyperparameter
+         for the G network loss to reconstruct input images. [0.2]
         """
 
-        self.b_work_on_patch = kb_work_on_patch
         self.sample_dir = sample_dir
-
         self.r_alpha = r_alpha
 
         self.input_height = input_height
@@ -52,7 +45,6 @@ class AloccModel:
         self.output_width = output_width
 
         self.z_dim = z_dim
-
         self.gf_dim = gf_dim
         self.df_dim = df_dim
 
