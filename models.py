@@ -1,7 +1,8 @@
 from __future__ import print_function, division
 
+import os
 import logging
-
+import numpy as np
 import matplotlib.pyplot as plt
 from keras.datasets import mnist
 from keras.layers import BatchNormalization
@@ -11,7 +12,7 @@ from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Model
 from keras.optimizers import RMSprop
 
-from kh_tools import *
+from kh_tools import get_noisy_data
 
 
 class AloccModel:
