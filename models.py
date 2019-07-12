@@ -2,11 +2,9 @@ from __future__ import print_function, division
 
 import logging
 import os
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.datasets import mnist
 from keras.layers import BatchNormalization
 from keras.layers import Input, Dense, Flatten
 from keras.layers.advanced_activations import LeakyReLU
@@ -16,21 +14,13 @@ from keras.optimizers import RMSprop
 
 from kh_tools import get_noisy_data
 
-# Make log folder if not exist.
-log_path = Path("log")
-if not log_path.exists():
-    log_path.mkdir()
-
 
 class AloccModel:
-    def __init__(self,
-                 input_height=28, input_width=28, output_height=28, output_width=28,
-                 attention_label=1, is_training=True,
-                 z_dim=100, gf_dim=16, df_dim=16, c_dim=3,
+    def __init__(self, data, input_height=28, input_width=28, output_height=28, output_width=28, attention_label=1,
+                 z_dim=100, gf_dim=16, df_dim=16, c_dim=1,
                  dataset_name=None, dataset_address=None, input_fname_pattern=None,
                  checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2,
-                 kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1,
-                 n_fetch_data=10):
+                 kb_work_on_patch=True, nd_patch_size=(10, 10), n_stride=1, n_fetch_data=10):
         """
         This is the main class of our Adversarially Learned One-Class Classifier for Novelty Detection.
         :param sess: TensorFlow session.
@@ -39,7 +29,6 @@ class AloccModel:
         :param output_height: The height of the output images to produce.
         :param output_width: The width of the output images to produce.
         :param attention_label: Conditioned label that growth attention of training label [1]
-        :param is_training: True if in training mode.
         :param z_dim:  (optional) Dimension of dim for Z, the output of encoder. [100]
         :param gf_dim: (optional) Dimension of gen filters in first conv layer, i.e. g_decoder_h0. [16] 
         :param df_dim: (optional) Dimension of discrim filters in first conv layer, i.e. d_h0_conv. [16] 
@@ -59,8 +48,6 @@ class AloccModel:
         self.b_work_on_patch = kb_work_on_patch
         self.sample_dir = sample_dir
 
-        self.is_training = is_training
-
         self.r_alpha = r_alpha
 
         self.input_height = input_height
@@ -79,22 +66,9 @@ class AloccModel:
         self.checkpoint_dir = checkpoint_dir
 
         self.attention_label = attention_label
-        if self.is_training:
-            log_file_name = "ALOCC_loss.log"
-            logging.basicConfig(filename=log_path.joinpath(log_file_name),
-                                level=logging.INFO)
+        self.c_dim = c_dim
+        self.data = data
 
-        if self.dataset_name == 'mnist':
-            (X_train, y_train), (_, _) = mnist.load_data()
-            # Make the data range between 0~1.
-            X_train = X_train / 255
-            specific_idx = np.where(y_train == self.attention_label)[0]
-            self.data = X_train[specific_idx].reshape(-1, 28, 28, 1)
-            self.c_dim = 1
-        else:
-            assert ('Error in loading dataset')
-
-        self.grayscale = (self.c_dim == 1)
         self.discriminator = None
         self.generator = None
         self.adversarial_model = None
@@ -206,10 +180,8 @@ class AloccModel:
         self.adversarial_model.summary()
 
     def train(self, epochs, batch_size=128, sample_interval=500):
-
-        if self.dataset_name == 'mnist':
-            # Get a batch of sample images with attention_label to export as montage.
-            sample = self.data[0:batch_size]
+        # Get a batch of sample images with attention_label to export as montage.
+        sample = self.data[0:batch_size]
 
         # Export images as montage, sample_input also use later to generate sample R network outputs during training.
         sample_inputs = np.array(sample).astype(np.float32)
@@ -222,8 +194,7 @@ class AloccModel:
         plot_g_recon_losses = []
 
         # Load traning data, add random noise.
-        if self.dataset_name == 'mnist':
-            sample_w_noise = get_noisy_data(self.data)
+        sample_w_noise = get_noisy_data(self.data)
 
         # Adversarial ground truths
         ones = np.ones((batch_size, 1))
@@ -231,43 +202,39 @@ class AloccModel:
 
         for epoch in range(epochs):
             print('Epoch ({}/{})-------------------------------------------------'.format(epoch, epochs))
-            if self.dataset_name == 'mnist':
-                # Number of batches computed by total number of target data / batch size.
-                batch_idxs = len(self.data) // batch_size
+            # Number of batches computed by total number of target data / batch size.
+            batch_idxs = len(self.data) // batch_size
 
             for idx in range(0, batch_idxs):
                 # Get a batch of images and add random noise.
-                if self.dataset_name == 'mnist':
-                    batch = self.data[idx * batch_size:(idx + 1) * batch_size]
-                    batch_noise = sample_w_noise[idx * batch_size:(idx + 1) * batch_size]
-                    batch_clean = self.data[idx * batch_size:(idx + 1) * batch_size]
+                batch = self.data[idx * batch_size:(idx + 1) * batch_size]
+                batch_noise = sample_w_noise[idx * batch_size:(idx + 1) * batch_size]
+                batch_clean = self.data[idx * batch_size:(idx + 1) * batch_size]
                 # Turn batch images data to float32 type.
                 batch_images = np.array(batch).astype(np.float32)
                 batch_noise_images = np.array(batch_noise).astype(np.float32)
                 batch_clean_images = np.array(batch_clean).astype(np.float32)
-                if self.dataset_name == 'mnist':
-                    batch_fake_images = self.generator.predict(batch_noise_images)
-                    # Update D network, minimize real images inputs->D-> ones, noisy z->R->D->zeros loss.
-                    d_loss_real = self.discriminator.train_on_batch(batch_images, ones)
-                    d_loss_fake = self.discriminator.train_on_batch(batch_fake_images, zeros)
+                batch_fake_images = self.generator.predict(batch_noise_images)
+                # Update D network, minimize real images inputs->D-> ones, noisy z->R->D->zeros loss.
+                d_loss_real = self.discriminator.train_on_batch(batch_images, ones)
+                d_loss_fake = self.discriminator.train_on_batch(batch_fake_images, zeros)
 
-                    # Update R network twice, minimize noisy z->R->D->ones and reconstruction loss.
-                    self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
-                    g_loss = self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
-                    plot_epochs.append(epoch + idx / batch_idxs)
-                    plot_g_recon_losses.append(g_loss[1])
+                # Update R network twice, minimize noisy z->R->D->ones and reconstruction loss.
+                self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
+                g_loss = self.adversarial_model.train_on_batch(batch_noise_images, [batch_clean_images, ones])
+                plot_epochs.append(epoch + idx / batch_idxs)
+                plot_g_recon_losses.append(g_loss[1])
                 counter += 1
                 msg = 'Epoch:[{0}]-[{1}/{2}] --> d_loss: {3:>0.3f}, g_loss:{4:>0.3f}, g_recon_loss:{4:>0.3f}'.format(
                     epoch, idx, batch_idxs, d_loss_real + d_loss_fake, g_loss[0], g_loss[1])
                 print(msg)
                 logging.info(msg)
                 if np.mod(counter, sample_interval) == 0:
-                    if self.dataset_name == 'mnist':
-                        samples = self.generator.predict(sample_inputs)
-                        manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
-                        manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
-                        # save_images(samples, [manifold_h, manifold_w],
-                        #             './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
+                    samples = self.generator.predict(sample_inputs)
+                    manifold_h = int(np.ceil(np.sqrt(samples.shape[0])))
+                    manifold_w = int(np.floor(np.sqrt(samples.shape[0])))
+                    # save_images(samples, [manifold_h, manifold_w],
+                    #             './{}/train_{:02d}_{:04d}.png'.format(self.sample_dir, epoch, idx))
 
             # Save the checkpoint end of each epoch.
             self.save(epoch)
@@ -294,8 +261,3 @@ class AloccModel:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         model_name = 'ALOCC_Model_{}.h5'.format(step)
         self.adversarial_model.save_weights(os.path.join(self.checkpoint_dir, model_name))
-
-
-if __name__ == '__main__':
-    model = AloccModel(dataset_name='mnist', input_height=28, input_width=28)
-    model.train(epochs=5, batch_size=128, sample_interval=500)
