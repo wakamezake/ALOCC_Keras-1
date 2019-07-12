@@ -11,6 +11,7 @@ matplotlib = "*"
 scikit-learn = "*"
 scikit-image = "*"
 Keras = "*"
+tensorflow-gpu = "==1.13.1"
 
 [dev-packages]
 
