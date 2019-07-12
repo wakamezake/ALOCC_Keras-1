@@ -237,3 +237,11 @@ class AloccModel:
         """
         model_name = 'ALOCC_Model_{}.h5'.format(step)
         self.adversarial_model.save_weights(self.checkpoint_path.joinpath(model_name))
+
+    def load_weight(self, weight_path):
+        self.adversarial_model.load_weights(weight_path)
+
+    def predict(self, images, weight_path):
+        self.load_weight(weight_path)
+        assert (self.input_height, self.input_width, self.c_dim) == (images.shape[1:])
+        return self.adversarial_model.predict(images)
