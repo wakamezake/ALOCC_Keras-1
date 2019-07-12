@@ -16,9 +16,9 @@ from kh_tools import get_noisy_data
 
 
 class AloccModel:
-    def __init__(self, data, input_height=28, input_width=28, output_height=28, output_width=28, attention_label=1,
-                 z_dim=100, gf_dim=16, df_dim=16, c_dim=1,
-                 checkpoint_dir='checkpoint', sample_dir='sample', r_alpha=0.2):
+    def __init__(self, data, checkpoint_dir, sample_dir,
+                 input_height=28, input_width=28, output_height=28, output_width=28, attention_label=1,
+                 z_dim=100, gf_dim=16, df_dim=16, c_dim=1, r_alpha=0.2):
         """
         This is the main class of our Adversarially Learned One-Class Classifier for Novelty Detection.
         :param input_height: The height of image to use.
@@ -35,8 +35,6 @@ class AloccModel:
         :param r_alpha: Refinement parameter, trade-off hyperparameter
          for the G network loss to reconstruct input images. [0.2]
         """
-
-        self.sample_dir = sample_dir
         self.r_alpha = r_alpha
 
         self.input_height = input_height
@@ -48,7 +46,8 @@ class AloccModel:
         self.gf_dim = gf_dim
         self.df_dim = df_dim
 
-        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_path = checkpoint_dir
+        self.sample_path = sample_dir
 
         self.attention_label = attention_label
         self.c_dim = c_dim
@@ -170,7 +169,6 @@ class AloccModel:
 
         # Export images as montage, sample_input also use later to generate sample R network outputs during training.
         sample_inputs = np.array(sample).astype(np.float32)
-        os.makedirs(self.sample_dir, exist_ok=True)
         # scipy.misc.imsave('./{}/train_input_samples.jpg'.format(self.sample_dir), montage(sample_inputs[:, :, :, 0]))
 
         counter = 1
@@ -237,6 +235,5 @@ class AloccModel:
         Arguments:
             step {[type]} -- [description]
         """
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
         model_name = 'ALOCC_Model_{}.h5'.format(step)
-        self.adversarial_model.save_weights(os.path.join(self.checkpoint_dir, model_name))
+        self.adversarial_model.save_weights(self.checkpoint_path.joinpath(model_name))

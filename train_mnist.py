@@ -17,6 +17,10 @@ def main():
     if not checkpoint_path.exists():
         checkpoint_path.mkdir()
 
+    sample_path = Path("sample")
+    if not sample_path.exists():
+        sample_path.mkdir()
+
     log_file_name = "ALOCC_loss.log"
     logging.basicConfig(filename=log_path.joinpath(log_file_name),
                         level=logging.INFO)
@@ -36,7 +40,8 @@ def main():
     batch_size = 128
     sample_interval = 500
 
-    model = AloccModel(data=data, dataset_name='mnist', input_height=image_size[0], input_width=image_size[1])
+    model = AloccModel(data=data, checkpoint_dir=checkpoint_path, sample_dir=sample_path,
+                       input_height=image_size[0], input_width=image_size[1])
     model.train(epochs=epochs, batch_size=batch_size, sample_interval=sample_interval)
 
 
